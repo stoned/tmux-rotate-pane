@@ -1,0 +1,28 @@
+#!/bin/bash -
+# yes we want to run this with bash in order to use its builtin command
+# mapfile and its array variables
+
+set -e  # exit on error
+
+# get list of inactive windows in current session
+mapfile -t < <(tmux list-window  -F '#{window_active} #{window_index}' | grep -v ^1)
+
+# only one window, nothing to do
+[[ ${#MAPFILE[@]} < 2 ]] && exit 0
+
+# if there is more than one inactive window move all other panes in the first inactive window
+target_window=${MAPFILE[0]:2}
+# move all panes not in active window neither in target window
+#  first get a list of these panes
+mapfile -t < <(tmux list-panes -s -F '#{window_active} #{window_index}.#{pane_index}' | egrep -v "^1 |0 ${target_window}\.")
+#  and move then into target window
+while  [[ ${#MAPFILE[@]} -gt 0 ]]; do
+  # try to make some room to move the pane into the target window
+  tmux select-layout -t ${target_window}.0 even-vertical
+  # move the first pane in the list into the target window
+  tmux join-pane -d -p 1 -s ${MAPFILE[0]:2} -t ${target_window}.0
+  # start over, get the list of remaining panes to move
+  mapfile -t < <(tmux list-panes -s -F '#{window_active} #{window_index}.#{pane_index}' | egrep -v "^1 |0 ${target_window}\.")
+done
+# do a last final relayout of the target window
+tmux select-layout -t ${target_window}.0 even-vertical

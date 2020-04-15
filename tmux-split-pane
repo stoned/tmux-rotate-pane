@@ -1,0 +1,28 @@
+#!/bin/bash -
+# yes we want to run this with bash in order to use its builtin command
+# mapfile and its array variables
+
+set -e  # exit on error
+
+# get list of panes in active window
+mapfile -t < <(tmux list-panes -s -F '#{window_active} #{window_index}.#{pane_index}' | egrep ^1)
+
+# only one pane in the current window, split it and be done !
+if [[ ${#MAPFILE[@]} < 2 ]] ; then
+  tmux split-window -c '#{pane_current_path}'
+  exit $?
+fi
+
+# get list of windows in current session
+mapfile -t < <(tmux list-window  -F '#{window_index}')
+
+# only one window, create another one, swap pane and be done !
+if [[ ${#MAPFILE[@]} < 2 ]] ; then
+  tmux new-window -d -c '#{pane_current_path}'
+  tmux swap-pane -s :+.top \; rotate-window -Ut :+
+  exit $?
+fi
+
+# create a pane in next window, swap pane, rotate pane in next window
+tmux split-window -d -c "#{pane_current_path}" -b -t :+.top
+tmux swap-pane -s :+.top \; rotate-window -Ut :+
